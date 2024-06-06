@@ -2,9 +2,15 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, from_json, count, array_distinct, collect_set, flatten, array
 from pyspark.sql.types import BooleanType, IntegerType, StringType, StructType, StructField
+import calendar
+import time
+
+def getCurrentTimestamp():
+    return int(calendar.timegm(time.gmtime()))
 
 def main():
     # Initialize Spark Session
+    start_time = getCurrentTimestamp()
     # I create 2 collections in my local database: collection testing for reading input and collection testing_summary for writting output
     spark = SparkSession.builder \
         .appName("FacebookRequestProcessor") \
@@ -33,15 +39,15 @@ def main():
     # Only keep columns requestUrl + message column
     partitioned_requests = df.select(col('requestUrl'), col('message'))
     
-    partitioned_requests.show(truncate=False)
-    partitioned_requests.printSchema()
+    # partitioned_requests.show(truncate=False)
+    # partitioned_requests.printSchema()
 
 
     # Parse JSON message and extract error details
     parsed_requests = partitioned_requests.withColumn("message", from_json("message", message_schema)).select(col('requestUrl'), col('message.error.message'),col("message.error.error_user_msg"))
     
-    parsed_requests.show(truncate=False)
-    parsed_requests.printSchema()
+    # parsed_requests.show(truncate=False)
+    # parsed_requests.printSchema()
 
 
     # Group by requestUrl and aggregate message and error_user_msg
@@ -54,8 +60,8 @@ def main():
         .withColumn("messages", array_distinct(flatten(array("messages", "error_user_msgs")))) \
         .drop("error_user_msgs")
         
-    grouped_requests.show(truncate=False)
-    grouped_requests.printSchema()
+    # grouped_requests.show(truncate=False)
+    # grouped_requests.printSchema()
 
     # # # Write the summarized data to S3
     # # grouped_requests.write.json("s3://your-bucket/facebook-request-summary/")
@@ -65,6 +71,10 @@ def main():
 
     # Stop Spark Session
     spark.stop()
+
+    end_time = getCurrentTimestamp()
+
+    print(end_time - start_time)    #local 41s, 32s, ...
 
 
 if __name__ == '__main__':
